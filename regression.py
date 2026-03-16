@@ -13,7 +13,7 @@ BOUNDS = {
 }
 
 VARIABLES = ("E_D", "W_C", "V")
-RESPONSE = "vol_NH3"
+RESPONSES = ("vol_NH3", "M_add_kNm", "W_add", "GM", "C_TCO")
 
 FULL_FACTORIAL_LEVELS = {
     "E_D": np.linspace(BOUNDS["E_D"][0], BOUNDS["E_D"][1], 4),
@@ -98,8 +98,8 @@ def build_sampling_table(coded_points, physical_points, design_name):
     return pd.DataFrame.from_records(records)
 
 
-def evaluate_response(table, tank_type):
-    response_values = []
+def evaluate_responses(table, tank_type):
+    records = []
 
     for row in table.itertuples(index=False):
         model = ship_model(
@@ -108,11 +108,16 @@ def evaluate_response(table, tank_type):
             V=float(row.V),
             tank_type=tank_type,
         )
-        response_values.append(getattr(model, RESPONSE))
+
+        record = {response_name: getattr(model, response_name) for response_name in RESPONSES}
+        records.append(record)
 
     result = table.copy()
     result["tank_type"] = tank_type
-    result[RESPONSE] = response_values
+
+    for response_name in RESPONSES:
+        result[response_name] = [record[response_name] for record in records]
+
     return result
 
 
@@ -145,9 +150,9 @@ def build_design_matrix(table, terms):
     return np.column_stack(columns)
 
 
-def fit_model(table, terms):
+def fit_model(table, response_name, terms):
     design_matrix = build_design_matrix(table, terms)
-    response = table[RESPONSE].to_numpy()
+    response = table[response_name].to_numpy()
     coefficients, _, _, _ = np.linalg.lstsq(design_matrix, response, rcond=None)
     predicted = design_matrix @ coefficients
     residual = response - predicted
@@ -168,24 +173,21 @@ def fit_model(table, terms):
     return {
         "terms": list(terms),
         "coefficients": coefficients,
-        "predicted": predicted,
-        "residual": residual,
         "r_squared": r_squared,
         "adjusted_r_squared": adjusted_r_squared,
         "rmse": rmse,
     }
 
 
-def select_compact_model(table, improvement_tolerance=1e-10):
-    current = fit_model(table, BASE_TERMS)
-    selection_log = []
+def select_compact_model(table, response_name, improvement_tolerance=1e-10):
+    current = fit_model(table, response_name, BASE_TERMS)
     remaining_terms = list(CANDIDATE_TERMS)
 
     while remaining_terms:
         trials = []
 
         for candidate in remaining_terms:
-            trial = fit_model(table, current["terms"] + [candidate])
+            trial = fit_model(table, response_name, current["terms"] + [candidate])
             trials.append((candidate, trial))
 
         trials.sort(
@@ -199,16 +201,6 @@ def select_compact_model(table, improvement_tolerance=1e-10):
 
         candidate_name, best_trial = trials[0]
         improvement = best_trial["adjusted_r_squared"] - current["adjusted_r_squared"]
-        selection_log.append(
-            {
-                "candidate": candidate_name,
-                "adj_R2_current": current["adjusted_r_squared"],
-                "adj_R2_trial": best_trial["adjusted_r_squared"],
-                "delta_adj_R2": improvement,
-                "rmse_trial": best_trial["rmse"],
-                "selected": improvement > improvement_tolerance,
-            }
-        )
 
         if improvement <= improvement_tolerance:
             break
@@ -216,59 +208,56 @@ def select_compact_model(table, improvement_tolerance=1e-10):
         current = best_trial
         remaining_terms.remove(candidate_name)
 
-    return fit_model(table, BASE_TERMS), current, pd.DataFrame(selection_log)
+    return current
 
 
-def format_equation(coefficients, term_names, precision=12):
-    terms = [f"{coefficients[0]:.{precision}f}"]
+def format_equation(coefficients, term_names, precision=12, zero_tolerance=1e-9):
+    intercept = 0.0 if abs(coefficients[0]) < zero_tolerance else coefficients[0]
+    terms = [f"{intercept:.{precision}f}"]
 
     for coefficient, term_name in zip(coefficients[1:], term_names):
+        if abs(coefficient) < zero_tolerance:
+            continue
         sign = "+" if coefficient >= 0 else "-"
         terms.append(f"{sign} {abs(coefficient):.{precision}f}*{term_name}")
 
     return " ".join(terms)
 
 
-def print_fit_summary(model_name, fit_result):
-    print(model_name)
-    print(f"Terms: {', '.join(fit_result['terms'])}")
-    print(f"R^2 = {fit_result['r_squared']:.10f}")
-    print(f"Adjusted R^2 = {fit_result['adjusted_r_squared']:.10f}")
-    print(f"RMSE = {fit_result['rmse']:.10f}")
-    print(f"{RESPONSE} = {format_equation(fit_result['coefficients'], fit_result['terms'])}")
-    print()
-
-
-def print_selection_log(selection_log):
-    print("Adjusted R^2 term-selection log:")
-    if selection_log.empty:
-        print("No candidate terms were tested.")
-    else:
-        print(selection_log.to_string(index=False, float_format=lambda value: f"{value:12.10f}"))
-    print()
-
-
 def export_results(table, tank_type, design_label):
-    base_name = f"{RESPONSE}_{tank_type}_{design_label}".replace("-", "_")
-    output_path = f"{base_name}_points.csv"
+    base_name = f"{tank_type}_{design_label}".replace("-", "_")
+    output_path = f"sample_points_{base_name}.csv"
     table.to_csv(output_path, index=False)
     return output_path
 
 
+def print_final_models(tank_type, design_label, output_path, model_results):
+    print(f"{tank_type} {design_label}:")
+    print(f"Sampling points and response values written to {output_path}")
+
+    for response_name in RESPONSES:
+        fit_result = model_results[response_name]
+        print(
+            f"{response_name}: "
+            f"Adj R^2 = {fit_result['adjusted_r_squared']:.10f}, "
+            f"RMSE = {fit_result['rmse']:.10f}"
+        )
+        print(f"{response_name} = {format_equation(fit_result['coefficients'], fit_result['terms'])}")
+
+    print()
+
+
 def run_case(tank_type, design_label, coded_points, physical_points):
     table = build_sampling_table(coded_points, physical_points, design_label)
-    table = evaluate_response(table, tank_type=tank_type)
+    table = evaluate_responses(table, tank_type=tank_type)
     output_path = export_results(table, tank_type, design_label)
 
-    simple_model, final_model, selection_log = select_compact_model(table)
+    model_results = {
+        response_name: select_compact_model(table, response_name)
+        for response_name in RESPONSES
+    }
 
-    print(f"{tank_type} {design_label}:")
-    print(f"Sampling points and {RESPONSE} values written to {output_path}")
-    print(f"Rows: {len(table)}")
-    print()
-    print_fit_summary(f"{tank_type} simple linear model:", simple_model)
-    print_selection_log(selection_log)
-    print_fit_summary(f"{tank_type} final compact model:", final_model)
+    print_final_models(tank_type, design_label, output_path, model_results)
 
 
 def main():
