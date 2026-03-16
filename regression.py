@@ -23,6 +23,7 @@ FULL_FACTORIAL_LEVELS = {
 
 BASE_TERMS = ["E_D", "W_C", "V"]
 CANDIDATE_TERMS = ["E_D*W_C", "E_D*V", "W_C*V", "E_D^2", "W_C^2", "V^2"]
+TABLE_PREVIEW_ROWS = 8
 
 
 def midpoint_and_half_range(name):
@@ -231,7 +232,10 @@ def format_equation(coefficients, term_names, precision=12):
 
 def print_sampling_table(table, title):
     print(title)
-    print(table.to_string(index=False, float_format=lambda value: f"{value:12.6f}"))
+    preview = table.head(TABLE_PREVIEW_ROWS)
+    print(preview.to_string(index=False, float_format=lambda value: f"{value:12.6f}"))
+    if len(table) > TABLE_PREVIEW_ROWS:
+        print(f"... {len(table) - TABLE_PREVIEW_ROWS} more rows written to CSV")
     print()
 
 
@@ -256,13 +260,15 @@ def print_selection_log(selection_log):
 
 def export_results(table, tank_type, design_label):
     base_name = f"{RESPONSE}_{tank_type}_{design_label}".replace("-", "_")
-    table.to_csv(f"{base_name}_points.csv", index=False)
+    output_path = f"{base_name}_points.csv"
+    table.to_csv(output_path, index=False)
+    return output_path
 
 
 def run_case(tank_type, design_label, coded_points, physical_points):
     table = build_sampling_table(coded_points, physical_points, design_label)
     table = evaluate_response(table, tank_type=tank_type)
-    export_results(table, tank_type, design_label)
+    output_path = export_results(table, tank_type, design_label)
 
     simple_model, final_model, selection_log = select_compact_model(table)
 
@@ -270,6 +276,9 @@ def run_case(tank_type, design_label, coded_points, physical_points):
         table,
         title=f"{tank_type} {design_label} sampling points and {RESPONSE} values:",
     )
+    print(f"Rows: {len(table)}")
+    print(f"CSV: {output_path}")
+    print()
     print_fit_summary(f"{tank_type} simple linear model:", simple_model)
     print_selection_log(selection_log)
     print_fit_summary(f"{tank_type} final compact model:", final_model)
