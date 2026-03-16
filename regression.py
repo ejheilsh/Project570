@@ -237,11 +237,11 @@ def print_final_models(tank_type, design_label, output_path, model_results):
 
     for response_name in RESPONSES:
         fit_result = model_results[response_name]
-        print(
-            f"{response_name}: "
-            f"Adj R^2 = {fit_result['adjusted_r_squared']:.10f}, "
-            f"RMSE = {fit_result['rmse']:.10f}"
-        )
+        # print(
+        #     f"{response_name}: "
+        #     f"Adj R^2 = {fit_result['adjusted_r_squared']:.10f}, "
+        #     f"RMSE = {fit_result['rmse']:.10f}"
+        # )
         print(f"{response_name} = {format_equation(fit_result['coefficients'], fit_result['terms'])}")
 
     print()

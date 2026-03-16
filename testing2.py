@@ -9,13 +9,43 @@ from model_class import ship_model
 E_D_VALUES = np.linspace(9e3, 24e3, 50)
 W_C_VALUES = np.linspace(80000.0, 175000.0, 45)
 SPEEDS = [10.0, 12.0, 14.0, 16.0]
-# TANK_TYPE = "in-hold"
-TANK_TYPE = "on-deck"
+TANK_TYPE = "in-hold"
+# TANK_TYPE = "on-deck"
+# OUTPUT_NAME = "C_TCO"
+OUTPUT_NAME = "M_add_kNm"
+
+OUTPUT_CONFIG = {
+    "vol_NH3": {
+        "zlabel": "Ammonia volume (m^3)",
+        "title": "Ammonia volume surfaces vs endurance and cargo capacity",
+        "filename": "vol_NH3_surfaces",
+    },
+    "M_add_kNm": {
+        "zlabel": "Additional bending moment (kN-m)",
+        "title": "Additional bending moment surfaces vs endurance and cargo capacity",
+        "filename": "M_add_kNm_surfaces",
+    },
+    "W_add": {
+        "zlabel": "Additional weight (tons)",
+        "title": "Additional weight surfaces vs endurance and cargo capacity",
+        "filename": "W_add_surfaces",
+    },
+    "GM": {
+        "zlabel": "GM (m)",
+        "title": "GM surfaces vs endurance and cargo capacity",
+        "filename": "GM_surfaces",
+    },
+    "C_TCO": {
+        "zlabel": "Additional TCO ($)",
+        "title": "C_TCO surfaces vs endurance and cargo capacity",
+        "filename": "C_TCO_surfaces",
+    },
+}
 
 
-def evaluate_cost_grid(speed):
+def evaluate_response_grid(speed, output_name):
     e_grid, w_grid = np.meshgrid(E_D_VALUES, W_C_VALUES)
-    cost_grid = np.zeros_like(e_grid, dtype=float)
+    response_grid = np.zeros_like(e_grid, dtype=float)
 
     for i in range(w_grid.shape[0]):
         for j in range(e_grid.shape[1]):
@@ -25,12 +55,19 @@ def evaluate_cost_grid(speed):
                 V=speed,
                 tank_type=TANK_TYPE,
             )
-            cost_grid[i, j] = model.C_TCO
+            response_grid[i, j] = getattr(model, output_name)
 
-    return e_grid, w_grid, cost_grid
+    return e_grid, w_grid, response_grid
 
 
 def main():
+    if OUTPUT_NAME not in OUTPUT_CONFIG:
+        valid_outputs = ", ".join(OUTPUT_CONFIG)
+        raise ValueError(f"Unsupported output '{OUTPUT_NAME}'. Choose from: {valid_outputs}")
+
+    output_config = OUTPUT_CONFIG[OUTPUT_NAME]
+    tank_slug = TANK_TYPE.replace("-", "_")
+
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection="3d")
     cmap = plt.get_cmap("viridis")
@@ -38,11 +75,11 @@ def main():
     legend_items = []
 
     for speed, color in zip(SPEEDS, colors):
-        e_grid, w_grid, cost_grid = evaluate_cost_grid(speed)
+        e_grid, w_grid, response_grid = evaluate_response_grid(speed, OUTPUT_NAME)
         ax.plot_surface(
             e_grid,
             w_grid,
-            cost_grid,
+            response_grid,
             color=color,
             alpha=0.65,
             linewidth=0,
@@ -51,15 +88,15 @@ def main():
         )
         legend_items.append(Line2D([0], [0], color=color, lw=4, label=f"V = {speed:.0f} kt"))
 
-    ax.set_title("In-hold C_TCO surfaces vs endurance and cargo capacity")
+    ax.set_title(f"{TANK_TYPE.title()} {output_config['title']}")
     ax.set_xlabel("Endurance, E_D (nm)")
     ax.set_ylabel("Cargo deadweight, W_C (tons)")
-    ax.set_zlabel("Additional TCO ($)")
+    ax.set_zlabel(output_config["zlabel"])
     ax.view_init(elev=24, azim=-130)
     ax.legend(handles=legend_items, loc="upper left")
 
     fig.tight_layout()
-    fig.savefig("C_TCO_surfaces_in_hold.png", dpi=200)
+    fig.savefig(f"{output_config['filename']}_{tank_slug}.png", dpi=200)
     plt.show()
 
 
@@ -69,4 +106,3 @@ if __name__ == "__main__":
 
 # want to do regression that is quadratic in E_D
 # also need someone to do base regression
-

@@ -7,7 +7,7 @@ class ship_model:
     E_D: float              # endurance (nm)
     W_C: float              # cargo deadweight (tons)
     V: float                # speed (kt)
-    tank_type: str          # tank type/loaction ("on-deck" or "in-hold")
+    tank_type: str          # tank type/location ("on-deck" or "in-hold")
 
     def __post_init__(self):
         # check that ship speed is above 10 kts
