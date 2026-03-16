@@ -95,7 +95,7 @@ class ship_model:
         C_rev = E_T * E_ratio * C_LR
         self.C_TCO = C_fuel + C_capex + C_rev
 
-        print()
+        # print()
 
 
 
@@ -119,8 +119,8 @@ if __name__ == "__main__":
         "V": 10,
         "tank_type": "on-deck",
     }
-    s1 = ship_model(**inputs)
-    s1.print_outputs()
+    # s1 = ship_model(**inputs)
+    # s1.print_outputs()
 
 
     print()

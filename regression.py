@@ -23,7 +23,6 @@ FULL_FACTORIAL_LEVELS = {
 
 BASE_TERMS = ["E_D", "W_C", "V"]
 CANDIDATE_TERMS = ["E_D*W_C", "E_D*V", "W_C*V", "E_D^2", "W_C^2", "V^2"]
-TABLE_PREVIEW_ROWS = 8
 
 
 def midpoint_and_half_range(name):
@@ -230,15 +229,6 @@ def format_equation(coefficients, term_names, precision=12):
     return " ".join(terms)
 
 
-def print_sampling_table(table, title):
-    print(title)
-    preview = table.head(TABLE_PREVIEW_ROWS)
-    print(preview.to_string(index=False, float_format=lambda value: f"{value:12.6f}"))
-    if len(table) > TABLE_PREVIEW_ROWS:
-        print(f"... {len(table) - TABLE_PREVIEW_ROWS} more rows written to CSV")
-    print()
-
-
 def print_fit_summary(model_name, fit_result):
     print(model_name)
     print(f"Terms: {', '.join(fit_result['terms'])}")
@@ -272,12 +262,9 @@ def run_case(tank_type, design_label, coded_points, physical_points):
 
     simple_model, final_model, selection_log = select_compact_model(table)
 
-    print_sampling_table(
-        table,
-        title=f"{tank_type} {design_label} sampling points and {RESPONSE} values:",
-    )
+    print(f"{tank_type} {design_label}:")
+    print(f"Sampling points and {RESPONSE} values written to {output_path}")
     print(f"Rows: {len(table)}")
-    print(f"CSV: {output_path}")
     print()
     print_fit_summary(f"{tank_type} simple linear model:", simple_model)
     print_selection_log(selection_log)
