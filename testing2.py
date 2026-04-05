@@ -5,14 +5,17 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 from model_class import ship_model
 
+# AI was used to help generalize and improve the functionality of this plotting script
 
-E_D_VALUES = np.linspace(9e3, 24e3, 50)
+
+E_D_VALUES = np.linspace(9e3, 48e3, 50)
 W_C_VALUES = np.linspace(80000.0, 175000.0, 45)
 SPEEDS = [10.0, 12.0, 14.0, 16.0]
-TANK_TYPE = "in-hold"
-# TANK_TYPE = "on-deck"
-# OUTPUT_NAME = "C_TCO"
-OUTPUT_NAME = "M_add_kNm"
+# TANK_TYPE = "in-hold"
+TANK_TYPE = "on-deck"
+OUTPUT_NAME = "W_add"
+OUTPUT_NAME = "C_TCO"
+# OUTPUT_NAME = "vol_NH3"
 
 OUTPUT_CONFIG = {
     "vol_NH3": {

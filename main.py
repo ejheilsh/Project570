@@ -1,5 +1,8 @@
+from particle_swarm import main as run_particle_swarm
+
+
 def main():
-    print("Hello from project570!")
+    run_particle_swarm()
 
 
 if __name__ == "__main__":

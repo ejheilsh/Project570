@@ -5,6 +5,7 @@ import pandas as pd
 
 from model_class import ship_model
 
+# AI was used to help generalize and improve the functionality of this regression script
 
 BOUNDS = {
     "E_D": (9000.0, 24000.0),
@@ -179,6 +180,10 @@ def fit_model(table, response_name, terms):
     }
 
 
+def fit_simple_model(table, response_name):
+    return fit_model(table, response_name, BASE_TERMS)
+
+
 def select_compact_model(table, response_name, improvement_tolerance=1e-10):
     current = fit_model(table, response_name, BASE_TERMS)
     remaining_terms = list(CANDIDATE_TERMS)
@@ -231,18 +236,20 @@ def export_results(table, tank_type, design_label):
     return output_path
 
 
-def print_final_models(tank_type, design_label, output_path, model_results):
+def print_model_details(response_name, model_label, fit_result):
+    print(f"{response_name} ({model_label}):")
+    print(f"  Adj R^2 = {fit_result['adjusted_r_squared']:.10f}")
+    print(f"  RMSE = {fit_result['rmse']:.10f}")
+    print(f"  Equation: {format_equation(fit_result['coefficients'], fit_result['terms'])}")
+
+
+def print_final_models(tank_type, design_label, output_path, simple_results, refined_results):
     print(f"{tank_type} {design_label}:")
     print(f"Sampling points and response values written to {output_path}")
 
     for response_name in RESPONSES:
-        fit_result = model_results[response_name]
-        # print(
-        #     f"{response_name}: "
-        #     f"Adj R^2 = {fit_result['adjusted_r_squared']:.10f}, "
-        #     f"RMSE = {fit_result['rmse']:.10f}"
-        # )
-        print(f"{response_name} = {format_equation(fit_result['coefficients'], fit_result['terms'])}")
+        print_model_details(response_name, "simple", simple_results[response_name])
+        print_model_details(response_name, "refined", refined_results[response_name])
 
     print()
 
@@ -252,12 +259,16 @@ def run_case(tank_type, design_label, coded_points, physical_points):
     table = evaluate_responses(table, tank_type=tank_type)
     output_path = export_results(table, tank_type, design_label)
 
-    model_results = {
+    simple_results = {
+        response_name: fit_simple_model(table, response_name)
+        for response_name in RESPONSES
+    }
+    refined_results = {
         response_name: select_compact_model(table, response_name)
         for response_name in RESPONSES
     }
 
-    print_final_models(tank_type, design_label, output_path, model_results)
+    print_final_models(tank_type, design_label, output_path, simple_results, refined_results)
 
 
 def main():
